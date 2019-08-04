@@ -6,9 +6,39 @@ import datetime
 import re
 
 from telegram import Update
-from telegram.ext import Updater, CommandHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, DispatcherHandlerStop
 
 from common import get_telegram_bot_token
+
+
+"""
+Check if sender is admin or creator, if not raise DispatcherHandlerStop to stop all subsequent handler
+"""
+def check_if_admin_handler(bot, update):
+    chat_id = update.message.chat.id
+    if not chat_id:
+        raise DispatcherHandlerStop()
+
+    message = update.message
+
+    if not message.from_user:    # No sender
+        raise DispatcherHandlerStop()
+
+    user_id = message.from_user.id
+
+    # Get sender info in the chat
+    chat_member = bot.get_chat_member(chat_id, user_id)
+    if not chat_member:
+        raise DispatcherHandlerStop()
+
+    # Sender is not the creator or admin, stop handling the message
+    if chat_member.status not in [
+        'creator',
+        'administrator',
+    ]:
+        raise DispatcherHandlerStop()
+
+    return
 
 
 """
@@ -72,8 +102,6 @@ def enable_auto_clear_command_handler(bot, update):
         },
         FilterExpression = 'chat_id = :chat_id AND next_clear_time < :next_clear_time_timestamp'
     )
-
-    print(response)
 
     # If earlier timestamp found, use that one as next clear time
     if response and 'Items' in response and len(response['Items']) and 'next_clear_time' in response['Items'][0] and 'N' in response['Items'][0]['next_clear_time']:
@@ -141,7 +169,7 @@ def get_next_clear_time_command_handler(bot, update):
 
     dynamodb_client = boto3.client('dynamodb')
 
-    # Get record for related chat
+    # Get related chat
     response = dynamodb_client.scan(
         TableName = 'telegram-auto-clear-bot-chats',
         Select = 'ALL_ATTRIBUTES',
@@ -208,10 +236,11 @@ def lambda_handler(event, context):
     update = Update.de_json(json.loads(body), bot)
 
     # Add command handlers
-    dispatcher.add_handler(CommandHandler('start', start_command_handler))
-    dispatcher.add_handler(CommandHandler('enable_auto_clear', enable_auto_clear_command_handler))
-    dispatcher.add_handler(CommandHandler('disable_auto_clear', disable_auto_clear_command_handler))
-    dispatcher.add_handler(CommandHandler('get_next_clear_time', get_next_clear_time_command_handler))
+    dispatcher.add_handler(CommandHandler('get_next_clear_time', get_next_clear_time_command_handler), group = 0)   # Always handle get clear time commad
+    dispatcher.add_handler(MessageHandler(Filters.all, check_if_admin_handler), group = 1)  # Prevent non-admin user to use other command
+    dispatcher.add_handler(CommandHandler('start', start_command_handler), group = 2)
+    dispatcher.add_handler(CommandHandler('enable_auto_clear', enable_auto_clear_command_handler), group = 2)
+    dispatcher.add_handler(CommandHandler('disable_auto_clear', disable_auto_clear_command_handler), group = 2)
 
     # Start process update
     dispatcher.process_update(update)

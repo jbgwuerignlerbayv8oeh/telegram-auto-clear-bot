@@ -8,10 +8,63 @@ from telegram import Bot
 from common import get_telegram_bot_token
 
 """
+Handle Chat ID change, move old record to record with new chat # IDEA:
+"""
+def change_chat_id(chat_id, new_chat_id):
+    # Get related chat
+    response = dynamodb_client.scan(
+        TableName = 'telegram-auto-clear-bot-chats',
+        Select = 'ALL_ATTRIBUTES',
+        ExpressionAttributeValues = {
+            ":chat_id": {
+                "S": str(chat_id)
+            }
+        },
+        FilterExpression = 'chat_id = :chat_id'
+    )
+
+    if not response:
+        return
+
+    if 'Items' not in response or len(response['Items']) == 0 or not response['Items'][0]:
+        return
+
+    item = response['Items'][0]
+
+    # Use new chat ID
+    item['chat_id'] = {
+        'S': str(new_chat_id)
+    }
+
+    # Create new item with new chat ID
+    response = dynamodb_client.put_item(
+        TableName = 'telegram-auto-clear-bot-chats',
+        Item = item
+    )
+
+    # Remove old record
+    response = dynamodb_client.delete_item(
+        TableName = 'telegram-auto-clear-bot-chats',
+        Key = {
+            'chat_id': {
+                'S': str(chat_id)
+            }
+        }
+    )
+    return
+
+"""
 Clear messages in specific chat
 """
 def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear_message_interval):
-    message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
+    try:
+        message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
+    except ChatMigrated as e:   # Chat ID changed
+        new_chat_id = e.new_chat_id
+        change_chat_id(dynamodb_client, chat_id, new_chat_id)
+        chat_id = new_chat_id
+        message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
+
 
     if not message or not message.message_id:
         return
