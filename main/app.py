@@ -162,7 +162,7 @@ def get_next_clear_time_command_handler(bot, update):
         bot.send_message(chat_id = chat_id, text = "已停用自動刪除")
         return
 
-    if 'Items' not in response or not response['Items'][0]:
+    if 'Items' not in response or len(response['Items']) == 0 or not response['Items'][0]:
         bot.send_message(chat_id = chat_id, text = "已停用自動刪除")
         return
 
