@@ -62,7 +62,6 @@ def enable_auto_clear_command_handler(bot, update):
     response = dynamodb_client.scan(
         TableName = 'telegram-auto-clear-bot-chats',
         Select = 'ALL_ATTRIBUTES',
-        Limit = 1,
         ExpressionAttributeValues = {
             ":chat_id": {
                 "S": str(chat_id)
@@ -146,7 +145,6 @@ def get_next_clear_time_command_handler(bot, update):
     response = dynamodb_client.scan(
         TableName = 'telegram-auto-clear-bot-chats',
         Select = 'ALL_ATTRIBUTES',
-        Limit = 1,
         ExpressionAttributeValues = {
             ":enabled": {
                 "BOOL": True
