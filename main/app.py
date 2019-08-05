@@ -53,6 +53,8 @@ def start_command_handler(bot, update):
 /disable_auto_clear - 停用自動清除功能
 
 /get_next_clear_time - 查看下次清除訊息時間
+
+超過48小時前的訊息不能清除，請手動清除舊訊息
     '''
 
     bot.send_message(chat_id = update.message.chat_id, text = help_text)

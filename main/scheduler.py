@@ -6,6 +6,7 @@ import datetime
 from telegram import Bot
 
 from common import get_telegram_bot_token
+from telegram.error import ChatMigrated
 
 """
 Handle Chat ID change, move old record to record with new chat # IDEA:
@@ -64,6 +65,8 @@ def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear
         change_chat_id(dynamodb_client, chat_id, new_chat_id)
         chat_id = new_chat_id
         message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
+    except:
+        return
 
 
     if not message or not message.message_id:
