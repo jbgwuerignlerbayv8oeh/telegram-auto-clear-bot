@@ -11,7 +11,7 @@ from telegram.error import ChatMigrated
 """
 Handle Chat ID change, move old record to record with new chat # IDEA:
 """
-def change_chat_id(chat_id, new_chat_id):
+def change_chat_id(dynamodb_client, chat_id, new_chat_id):
     # Get related chat
     response = dynamodb_client.scan(
         TableName = 'telegram-auto-clear-bot-chats',
