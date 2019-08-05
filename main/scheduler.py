@@ -2,11 +2,38 @@
 
 import boto3
 import datetime
+import threading
+import time
 
 from telegram import Bot
+from telegram.utils.request import Request
 
 from common import get_telegram_bot_token
 from telegram.error import ChatMigrated
+
+# Customized class for getting result from thread
+class ReturnResultThread(threading.Thread):
+	target = None
+	args = None
+	kwargs = None
+
+	def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, *, daemon=None):
+		super().__init__(group = group, target = target, name = name, args = args, kwargs = kwargs, daemon = daemon)
+		self._return = None
+		self.target = target
+		self.args = args
+		self.kwargs = kwargs
+
+	def run(self):
+		if self.target is not None:
+			try:
+				self._return = self.target(*self.args, **self.kwargs)
+			except Exception as e:
+				return
+
+	def join(self, timeout=None):
+		super().join(timeout)
+		return self._return
 
 """
 Handle Chat ID change, move old record to record with new chat # IDEA:
@@ -61,6 +88,7 @@ def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear
     try:
         message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
     except ChatMigrated as e:   # Chat ID changed
+        print("Chat ID: %s" % str(chat_id))
         print(e)
 
         new_chat_id = e.new_chat_id
@@ -68,6 +96,7 @@ def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear
         chat_id = new_chat_id
         message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
     except Exception as e:
+        print("Chat ID: %s" % str(chat_id))
         print(e)
         return
 
@@ -77,28 +106,57 @@ def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear
 
     message_id = message.message_id
 
-    start_from = message_id - 20    # Retain latest messages
+    start_from = message_id - 5    # Retain latest messages
 
-    # Flag for getting latest deleted message ID
-    has_deleted = False
+    # Saving latest deleted message ID
     latest_deleted_message_id = 1
 
+
     # Loop through message ID from last time deleted message ID to latest message ID
-    for i in reversed(range(last_deleted_message_id, start_from)):
-        try:
-            if bot.delete_message(chat_id, i, timeout = 0.00001) and not has_deleted:
-                latest_deleted_message_id = i    # Mark the latest deleted message, will be saved to `Chat` table
-                has_deleted = True
-        except Exception as e:
-            if e.message != 'Message to delete not found':
-                print(e)    # Log error message except message not found exception
+    message_id_list = list(range(last_deleted_message_id, start_from))
+
+    # Split the list every 500 items
+    splited_list = [message_id_list[x : x + 500] for x in range(0, len(message_id_list),500)]
+
+    for current_message_id_list in splited_list:   # Run specific number of threads in a time
+        thread_list = {}    # Reset thread list
+
+        for i in current_message_id_list:
+            thread = ReturnResultThread(target = bot.delete_message, args = (chat_id, i))
+            thread.start()
+            thread_list[i] = thread
+
+        time.sleep(6)  # Wait for 6 seconds
+
+        for i, thread in thread_list.items():
+            if not thread.is_alive():	# Thread finished
+                result = thread.join()
+                if i > latest_deleted_message_id:
+                    latest_deleted_message_id = i
+
+        # Save latest deleted message into `Chat` table
+        response = dynamodb_client.update_item(
+            TableName = 'telegram-auto-clear-bot-chats',
+            Key = {
+                'chat_id' : {
+                    'S' : str(chat_id)
+                }
+            },
+            ExpressionAttributeValues = {
+                ":latest_deleted_message_id": {
+                    "N": str(latest_deleted_message_id)
+                }
+            },
+            UpdateExpression = 'SET last_deleted_message_id = :latest_deleted_message_id'
+        )
+
 
     # Get next clear time
     now = datetime.datetime.now()
     next_clear_time = now + datetime.timedelta(hours = clear_message_interval)  # certain hours later
     next_clear_time_timestamp = int(next_clear_time.timestamp())
 
-    # Save latest deleted message and next clear time into `Chat` table
+    # Save next clear time into `Chat` table
     response = dynamodb_client.update_item(
         TableName = 'telegram-auto-clear-bot-chats',
         Key = {
@@ -107,14 +165,11 @@ def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear
             }
         },
         ExpressionAttributeValues = {
-            ":latest_deleted_message_id": {
-                "N": str(latest_deleted_message_id)
-            },
             ":next_clear_time_timestamp": {
                 "N": str(next_clear_time_timestamp)
             }
         },
-        UpdateExpression = 'SET last_deleted_message_id = :latest_deleted_message_id, next_clear_time = :next_clear_time_timestamp'
+        UpdateExpression = 'SET next_clear_time = :next_clear_time_timestamp'
     )
 
 
@@ -128,8 +183,11 @@ def lambda_handler(event, context):
     if not token:
         return
 
+    # Init Request instance
+    request = Request(con_pool_size = 10000, connect_timeout = 2, read_timeout = 2)
+
     # Init Bot instance
-    bot = Bot(token)
+    bot = Bot(token, request = request)
 
     # Get chat to be cleared
     dynamodb_client = boto3.client('dynamodb')

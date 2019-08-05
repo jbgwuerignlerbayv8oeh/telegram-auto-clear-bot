@@ -33,12 +33,13 @@ Resources:
       CodeUri: main/
       Handler: scheduler.lambda_handler
       Runtime: python3.7
-      Timeout: 900
+      Timeout: 60
+      MemorySize: 3008
       Events:
         Scheduler:
           Type: Schedule
           Properties:
-            Schedule: rate(5 minutes)
+            Schedule: rate(10 minutes)
       Policies:
       - SSMParameterReadPolicy:
           ParameterName:
