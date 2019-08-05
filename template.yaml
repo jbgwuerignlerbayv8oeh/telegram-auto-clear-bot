@@ -33,7 +33,7 @@ Resources:
       CodeUri: main/
       Handler: scheduler.lambda_handler
       Runtime: python3.7
-      Timeout: 300
+      Timeout: 900
       Events:
         Scheduler:
           Type: Schedule

@@ -61,11 +61,14 @@ def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear
     try:
         message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
     except ChatMigrated as e:   # Chat ID changed
+        print(e)
+
         new_chat_id = e.new_chat_id
         change_chat_id(dynamodb_client, chat_id, new_chat_id)
         chat_id = new_chat_id
         message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
-    except:
+    except Exception as e:
+        print(e)
         return
 
 
@@ -86,8 +89,9 @@ def clear_messages(bot, dynamodb_client, chat_id, last_deleted_message_id, clear
             if bot.delete_message(chat_id, i, timeout = 0.00001) and not has_deleted:
                 latest_deleted_message_id = i    # Mark the latest deleted message, will be saved to `Chat` table
                 has_deleted = True
-        except:
-            pass
+        except Exception as e:
+            if e.message != 'Message to delete not found':
+                print(e)    # Log error message except message not found exception
 
     # Get next clear time
     now = datetime.datetime.now()
