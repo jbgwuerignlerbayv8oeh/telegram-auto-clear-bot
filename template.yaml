@@ -33,13 +33,29 @@ Resources:
       CodeUri: main/
       Handler: scheduler.lambda_handler
       Runtime: python3.7
-      Timeout: 60
-      MemorySize: 3008
+      Timeout: 30
       Events:
         Scheduler:
           Type: Schedule
           Properties:
             Schedule: rate(10 minutes)
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            "telegram-auto-clear-bot-chats"
+      - LambdaInvokePolicy:
+          FunctionName:
+            "telegram-auto-clear-bot-clear-message-worker"
+
+  WorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: "telegram-auto-clear-bot-clear-message-worker"
+      CodeUri: main/
+      Handler: clear_message_worker.lambda_handler
+      Runtime: python3.7
+      Timeout: 300
+      MemorySize: 3008
       Policies:
       - SSMParameterReadPolicy:
           ParameterName:
