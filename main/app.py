@@ -84,6 +84,7 @@ def enable_auto_clear_command_handler(bot, update):
             if clear_message_interval > 47:
                 clear_message_interval = 47
 
+    dynamodb_client = boto3.client('dynamodb')
 
     # Get next clear time
     now = datetime.datetime.now()
@@ -131,7 +132,46 @@ def enable_auto_clear_command_handler(bot, update):
         UpdateExpression = 'SET enabled = :enabled, next_clear_time = :next_clear_time_timestamp, clear_message_interval = :clear_message_interval'
     )
 
-    bot.send_message(chat_id = update.message.chat_id, text = ("已啟動自動刪除，每%d小時自動清除訊息" % clear_message_interval))
+    message = bot.send_message(chat_id = update.message.chat_id, text = ("已啟動自動刪除，每%d小時自動清除訊息" % clear_message_interval))
+
+    if not message or not message.message_id:
+        return
+
+    message_id = message.message_id
+
+    # Get related chat
+    response = dynamodb_client.scan(
+        TableName = 'telegram-auto-clear-bot-chats',
+        Select = 'ALL_ATTRIBUTES',
+        ExpressionAttributeValues = {
+            ":chat_id": {
+                "S": str(chat_id)
+            }
+        },
+        FilterExpression = 'chat_id = :chat_id'
+    )
+
+    if response and 'Items' in response and len(response['Items']) > 0 and response['Items'][0]:
+        item = response['Items'][0]
+
+        # last_deleted_message_id not set
+        if 'last_deleted_message_id' not in item or 'N' not in item['last_deleted_message_id'] or not item['last_deleted_message_id']['N']:
+            # Save message ID as latest deleted message into `Chat` table
+            response = dynamodb_client.update_item(
+                TableName = 'telegram-auto-clear-bot-chats',
+                Key = {
+                    'chat_id' : {
+                        'S' : str(chat_id)
+                    }
+                },
+                ExpressionAttributeValues = {
+                    ":latest_deleted_message_id": {
+                        "N": str(message_id)
+                    }
+                },
+                UpdateExpression = 'SET last_deleted_message_id = :latest_deleted_message_id'
+            )
+
 
 """
 Handle /disable_auto_clear command, set enabled = False into `Chat` table

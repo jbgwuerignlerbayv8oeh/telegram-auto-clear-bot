@@ -98,17 +98,23 @@ def lambda_handler(event, context):
     if not token:
         return
 
-    # Init Request instance
+    # Init Request instance (For sending message)
+    send_message_request = Request(connect_timeout = 30, read_timeout = 30)
+
+    # Init Bot instance (For sending message)
+    send_message_bot = Bot(token, request = send_message_request)
+
+    # Init Request instance (For clearing message)
     request = Request(con_pool_size = 10000, connect_timeout = 2, read_timeout = 2)
 
-    # Init Bot instance
+    # Init Bot instance (For clearing message)
     bot = Bot(token, request = request)
 
     # Get DynamoDB clients
     dynamodb_client = boto3.client('dynamodb')
 
     try:
-        message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息", timeout = 120)
+        message = send_message_bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
     except ChatMigrated as e:   # Chat ID changed
         print("Chat ID: %s" % str(chat_id))
         print(e)
@@ -116,7 +122,7 @@ def lambda_handler(event, context):
         new_chat_id = e.new_chat_id
         change_chat_id(dynamodb_client, chat_id, new_chat_id)
         chat_id = new_chat_id
-        message = bot.send_message(chat_id = chat_id, text = "正在刪除訊息", timeout = 120)
+        message = send_message_bot.send_message(chat_id = chat_id, text = "正在刪除訊息")
     except Exception as e:
         print("Chat ID: %s" % str(chat_id))
         print(e)
@@ -137,8 +143,8 @@ def lambda_handler(event, context):
     # Loop through message ID from last time deleted message ID to latest message ID
     message_id_list = list(range(last_deleted_message_id, start_from))
 
-    # Split the list every 500 items
-    splited_list = [message_id_list[x : x + 500] for x in range(0, len(message_id_list),500)]
+    # Split the list every 100 items
+    splited_list = [message_id_list[x : x + 100] for x in range(0, len(message_id_list), 100)]
 
     for current_message_id_list in splited_list:   # Run specific number of threads in a time
         thread_list = {}    # Reset thread list
@@ -148,7 +154,7 @@ def lambda_handler(event, context):
             thread.start()
             thread_list[i] = thread
 
-        time.sleep(5)  # Wait for 5 seconds
+        time.sleep(10)  # Wait for 10 seconds
 
         for i, thread in thread_list.items():
             if not thread.is_alive():	# Thread finished
