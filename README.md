@@ -2,13 +2,15 @@
 
 Telegram bot for auto remove messages
 
----
+
 
 ## Setup process
 
 1. Install AWS CLI and SAM CLI
    
    See: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html
+   
+   You can skip **Step 5: Install Docker**
 
 1. Create Telegram bot
    
@@ -16,16 +18,30 @@ Telegram bot for auto remove messages
 
 1. Store your Telegram bot token into AWS SSM
    
-   See: https://docs.aws.amazon.com/systems-manager/latest/userguide/param-create-console.html. Set the parameter name as `MessageAutoClearTelegramBotToken`
+   See: https://docs.aws.amazon.com/systems-manager/latest/userguide/param-create-console.html
+   
+   Set the parameter as:
+   
+      - Name: `MessageAutoClearTelegramBotToken`
+      - Type: `String`
+      - Value: `{your_bot_token}`
 
 1. Deploy app to AWS
    
    See: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started-hello-world.html
+   
    ```
-   aws s3 mb s3://{BUCKET_NAME}    # Create a bucket to store packaged code
-   sam build    # Build the source code
-   sam package --output-template packaged.yaml --s3-bucket {BUCKET_NAME}    # Package the app
-   sam deploy --template-file packaged.yaml --stack-name {STACK_NAME} --capabilities CAPABILITY_IAM    # Deploy to AWS using CloudFormation
+   # You can skip it if your have done in Step 1, Create a bucket to store packaged code
+   aws s3 mb s3://{BUCKET_NAME}
+   
+   # Build the source code
+   sam build
+   
+   # Package the app
+   sam package --output-template packaged.yaml --s3-bucket {BUCKET_NAME}
+   
+   # Deploy to AWS using CloudFormation
+   sam deploy --template-file packaged.yaml --stack-name {STACK_NAME} --capabilities CAPABILITY_IAM
    ```
 
 1. Set bot webhook
@@ -37,20 +53,21 @@ Telegram bot for auto remove messages
       
       Set the webhook appended by your bot token i.e.: `https://xxxxxxxxx.execute-api.us-east-1.amazonaws.com/Prod/{token}`
 
----
+
 ## Configuration
 
 ##### `template.yaml`
    
    1. Scheduler Interval
+      
       This will affect how frequently the bot check whether it's time to clear message
       e.g. if set to `rate(10 minutes)` and the next clear time is 00:02 a.m. the bot will actually clear message at 00:10 a.m.
       ```yaml
       ...
       Resources:
-        Type: AWS::Serverless::Function
-          SchedulerFunction:
-          ...
+		...
+        SchedulerFunction:
+          Type: AWS::Serverless::Function
           Properties:
             ...
             Events:
@@ -61,6 +78,7 @@ Telegram bot for auto remove messages
        ```
        
    1. Worker function timeout and allowed memory
+      
       Since the worker function will open threads to clear messages one by one, it's important to allocate enough memory to them, and allow more time for them to do its job
       ```yaml
       ...
@@ -73,7 +91,7 @@ Telegram bot for auto remove messages
             Timeout: 600  # Change allowed runtime here, unit is second e.g. 600 seconds
             MemorySize: 3008  # Change allowed memory here, unit is MB, 3008 MB is maximum
             Policies:
-      ...
+              ...
       ```
         
 ##### `main/clear_message_worker.py`
