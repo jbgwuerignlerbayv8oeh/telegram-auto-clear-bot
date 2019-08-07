@@ -10,7 +10,7 @@ Telegram bot for auto remove messages
    
    See: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html
    
-   You can skip **Step 5: Install Docker**
+   You can skip **Step 5: Install Docker** if you want to build by your local python environment
 
 1. Create Telegram bot
    
@@ -28,21 +28,34 @@ Telegram bot for auto remove messages
 
 1. Deploy app to AWS
    
-   See: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started-hello-world.html
+   See: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started-hello-world.html#serverless-getting-started-hello-world-build
    
-   ```
-   # You can skip it if your have done in Step 1, Create a bucket to store packaged code
-   aws s3 mb s3://{BUCKET_NAME}
+   1. Create a bucket to store packaged code, you can skip it if your have done in Step 1
+
+      ```
+      aws s3 mb s3://{BUCKET_NAME}
+      ```
    
-   # Build the source code
-   sam build
+   1. Build the source code
+      ```
+      sam build
+      ```
+      Or
+      
+      Build with container if you have Docker installed
+      ```
+      sam build --use-container
+      ```
+  
+   1. Package the app
+      ```
+      sam package --output-template packaged.yaml --s3-bucket {BUCKET_NAME}
+      ```
    
-   # Package the app
-   sam package --output-template packaged.yaml --s3-bucket {BUCKET_NAME}
-   
-   # Deploy to AWS using CloudFormation
-   sam deploy --template-file packaged.yaml --stack-name {STACK_NAME} --capabilities CAPABILITY_IAM
-   ```
+   1. Deploy to AWS using CloudFormation
+      ```
+      sam deploy --template-file packaged.yaml --stack-name {STACK_NAME} --capabilities CAPABILITY_IAM
+      ```
 
 1. Set bot webhook
    1. Get the API endpoint from CloudFormation panel
