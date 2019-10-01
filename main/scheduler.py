@@ -59,11 +59,15 @@ def lambda_handler(event, context):
         else:
             last_deleted_message_id = 1
 
-        # Get clear message interval, set to 12 hours if no record
-        if 'clear_message_interval' in item and 'N' in item['clear_message_interval']:
-            clear_message_interval = int(item['clear_message_interval']['N'])
+        # UPDATE: Try to get interval from 'clear_message_interval_in_minutes' field first
+        if 'clear_message_interval_in_minutes' in item and 'N' in item['clear_message_interval_in_minutes']:
+            clear_message_interval = int(item['clear_message_interval_in_minutes']['N'])
         else:
-            clear_message_interval = 12
+            # Get clear message interval, set to 720 minutes (12 hours) if no record
+            if 'clear_message_interval' in item and 'N' in item['clear_message_interval']:
+                clear_message_interval = int(item['clear_message_interval']['N']) * 60  # Convert hour to minute
+            else:
+                clear_message_interval = 720
 
         lambda_client.invoke(
             FunctionName="telegram-auto-clear-bot-clear-message-worker",

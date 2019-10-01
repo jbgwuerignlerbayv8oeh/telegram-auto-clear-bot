@@ -38,7 +38,7 @@ Resources:
         Scheduler:
           Type: Schedule
           Properties:
-            Schedule: rate(10 minutes)
+            Schedule: rate(5 minutes)
       Policies:
       - DynamoDBCrudPolicy:
           TableName:

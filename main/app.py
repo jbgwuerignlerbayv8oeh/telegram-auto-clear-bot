@@ -48,7 +48,7 @@ def start_command_handler(bot, update):
     help_text = '''
 使用方法:
 
-/enable_auto_clear <hour> - 設定每<hour>小時自動清除訊息 (最多47小時)
+/enable_auto_clear <minute> - 設定每<minute>分鐘自動清除訊息 (最少15分鐘，最多2820分鐘)
 
 /disable_auto_clear - 停用自動清除功能
 
@@ -70,8 +70,8 @@ def enable_auto_clear_command_handler(bot, update):
 
     dynamodb_client = boto3.client('dynamodb')
 
-    # Get interval in hour from command
-    clear_message_interval = 12   # default to 12 hours
+    # Get interval in minutes from command
+    clear_message_interval = 720   # default to 720 minutes (12 hours)
     if update.message.text:
         command_text = update.message.text
 
@@ -80,15 +80,16 @@ def enable_auto_clear_command_handler(bot, update):
         if matches:
             clear_message_interval = int(matches.group(1))
 
-            # At most 47 hours
-            if clear_message_interval > 47:
-                clear_message_interval = 47
+            if clear_message_interval > 2820:   # At most 2820 minutes (47 hours)
+                clear_message_interval = 2820
+            elif clear_message_interval < 15:   # At least 15 minutes
+                clear_message_interval = 15
 
     dynamodb_client = boto3.client('dynamodb')
 
     # Get next clear time
     now = datetime.datetime.now()
-    next_clear_time = now + datetime.timedelta(hours = clear_message_interval)  # certain hours later
+    next_clear_time = now + datetime.timedelta(minutes = clear_message_interval)  # certain minutes later
     next_clear_time_timestamp = int(next_clear_time.timestamp())
 
     # Check if there is existing clear time earlier than the current one
@@ -125,14 +126,14 @@ def enable_auto_clear_command_handler(bot, update):
             ":next_clear_time_timestamp": {
                 "N": str(next_clear_time_timestamp)
             },
-            ':clear_message_interval': {
+            ':clear_message_interval_in_minute': {
                 "N": str(clear_message_interval)
             }
         },
-        UpdateExpression = 'SET enabled = :enabled, next_clear_time = :next_clear_time_timestamp, clear_message_interval = :clear_message_interval'
+        UpdateExpression = 'SET enabled = :enabled, next_clear_time = :next_clear_time_timestamp, clear_message_interval_in_minute = :clear_message_interval_in_minute'
     )
 
-    message = bot.send_message(chat_id = update.message.chat_id, text = ("已啟動自動刪除，每%d小時自動清除訊息" % clear_message_interval))
+    message = bot.send_message(chat_id = update.message.chat_id, text = ("已啟動自動刪除，每%d分鐘自動清除訊息" % clear_message_interval))
 
     if not message or not message.message_id:
         return

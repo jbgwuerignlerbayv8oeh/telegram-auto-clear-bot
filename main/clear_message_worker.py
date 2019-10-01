@@ -181,7 +181,7 @@ def lambda_handler(event, context):
 
     # Get next clear time
     now = datetime.datetime.now()
-    next_clear_time = now + datetime.timedelta(hours = clear_message_interval)  # certain hours later
+    next_clear_time = now + datetime.timedelta(minutes = clear_message_interval)  # certain minutes later
     next_clear_time_timestamp = int(next_clear_time.timestamp())
 
     # Save next clear time into `Chat` table
