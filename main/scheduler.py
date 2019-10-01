@@ -59,9 +59,9 @@ def lambda_handler(event, context):
         else:
             last_deleted_message_id = 1
 
-        # UPDATE: Try to get interval from 'clear_message_interval_in_minutes' field first
-        if 'clear_message_interval_in_minutes' in item and 'N' in item['clear_message_interval_in_minutes']:
-            clear_message_interval = int(item['clear_message_interval_in_minutes']['N'])
+        # UPDATE: Try to get interval from 'clear_message_interval_in_minute' field first
+        if 'clear_message_interval_in_minute' in item and 'N' in item['clear_message_interval_in_minute']:
+            clear_message_interval = int(item['clear_message_interval_in_minute']['N'])
         else:
             # Get clear message interval, set to 720 minutes (12 hours) if no record
             if 'clear_message_interval' in item and 'N' in item['clear_message_interval']:
